@@ -1,14 +1,11 @@
 (ns edn2csv.core
-  (require [clojure.core.reducers :as r]
-           [clojure.edn :as edn]
-           [clojure.java.io :as io]
-           [clojure.pprint :as pp]
-           [iota]
-           [me.raynes.fs :as fs])
-  (:gen-class))
-
-; The header line for the Individuals CSV file
-(def individuals-header-line "UUID:ID(Individual),Generation:int,Location:int,:LABEL")
+    (require [clojure.core.reducers :as r]
+             [clojure.edn :as edn]
+             [clojure.java.io :as io]
+             [clojure.pprint :as pp]
+             [iota]
+             [me.raynes.fs :as fs])
+    (:gen-class))
 
 ; Ignores (i.e., returns nil) any EDN entries that don't have the
 ; 'clojure/individual tag.
@@ -22,7 +19,7 @@
 ; clojure.data.csv, but that won't (as written) avoid the interleaving
 ; problems, so I'm sticking with this approach for now.
 (defn safe-println [output-stream & more]
-  (.write output-stream (str (clojure.string/join "," more) "\n")))
+    (.write output-stream (str (clojure.string/join "," more) "\n")))
 
 (def semantics-atom (atom {}))
 
@@ -45,7 +42,7 @@
     ;      (concat $ ["Individual"])
     ;      (apply safe-println individual-out-file $))
     (safe-println individual-out-file uuid generation location "Individual")
-    (swap! semantics-atom (partial merge-with concat) { {:total-error total-error :errors errors} [uuid] }) ; this feels wrong
+    (swap! semantics-atom (partial merge-with into) {[total-error errors] [uuid]}) ; this feels wrong
     (doseq [parent parent-uuids] (safe-println parentof-edges-out-file parent genetic-operators uuid "PARENT_OF"))
     1)
 
@@ -53,7 +50,7 @@
                         errors-out-file
                         individual-semantics-edges-out-file
                         semantics-error-edges-out-file
-                        [{total-error :total-error errors :errors} uuids]]
+                        [[total-error errors] uuids]]
     (let [semantic-uuid (new-uuid)] (safe-println semantics-out-file semantic-uuid total-error "Semantics")
                                     (doseq [ind-uuid uuids] (safe-println individual-semantics-edges-out-file ind-uuid semantic-uuid "HAS_SEMANTICS"))
                                     (doseq [[index item] (map-indexed vector errors)]
@@ -95,18 +92,17 @@
             (r/map (partial print-individual-to-csv
                             individual-out-file
                             parentof-edges-out-file))
-            (r/fold +)
-            )
+            (r/fold +))
         (doall (pmap (partial semantics-to-csv semantics-out-file ; this part is short and r/map doesn't work. Very little difference between map and pmap as well.
-                        errors-out-file
-                        individual-semantics-edges-out-file
-                        semantics-error-edges-out-file)
-                        @semantics-atom))))
+                              errors-out-file
+                              individual-semantics-edges-out-file
+                              semantics-error-edges-out-file)
+                     @semantics-atom))))
 
 (defn -main
-  [edn-filename]
+    [edn-filename]
     (time
-         (edn->csv-reducers edn-filename))
-  ; Necessary to get threads spun up by `pmap` to shutdown so you get
-  ; your prompt back right away when using `lein run`.
-  (shutdown-agents))
+        (edn->csv-reducers edn-filename))
+    ; Necessary to get threads spun up by `pmap` to shutdown so you get
+    ; your prompt back right away when using `lein run`.
+    (shutdown-agents))
